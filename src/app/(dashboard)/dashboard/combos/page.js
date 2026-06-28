@@ -491,6 +491,8 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
         // Build list of model values (providerId/modelId) from activeProviders
         const availableModels = [];
         for (const provider of activeProviders) {
+          // Skip inactive provider connections
+          if (provider.isActive === false) continue;
           const alias = getProviderAlias(provider.provider);
           const disabled = new Set(disabledByAlias[alias] || []);
 

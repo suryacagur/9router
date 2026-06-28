@@ -83,6 +83,8 @@ export default function ComboFormModal({ isOpen, combo, onClose, onSave, activeP
         const available = [];
 
         for (const provider of activeProviders) {
+          // Skip inactive provider connections
+          if (provider.isActive === false) continue;
           const alias = getProviderAlias(provider.provider);
           const disabled = new Set(disabledByAlias[alias] || []);
           const hardcoded = getModelsByProviderId(provider.provider);
