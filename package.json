@@ -11,15 +11,7 @@
     "build:bun": "bun --bun next build --webpack",
     "start:bun": "bun ./.next/standalone/server.js",
     "cli:pack": "npm --prefix cli run pack:cli",
-    "cli:publish": "npm --prefix cli run publish:cli",
-    "install:tests": "cd tests && npm install",
-    "install:cli": "cd cli && npm install",
-    "install:all": "npm install && npm run install:tests && npm run install:cli",
-    "build:cli": "cd cli && npm run build",
-    "build:all": "npm run build:cli && npm run build",
-    "clean:tests": "rimraf tests/package-lock.json tests/node_modules",
-    "clean:cli": "rimraf .next-cli-build cli/package-lock.json cli/node_modules cli/app cli/.build-home",
-    "clean:all": "npm run clean:tests && npm run clean:cli && rimraf package-lock.json .next node_modules"
+    "cli:publish": "npm --prefix cli run publish:cli"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -63,12 +55,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "postcss": "^8.5.6",
-    "rimraf": "^6.1.3",
     "tailwindcss": "^4"
-  },
-  "allowScripts": {
-    "better-sqlite3@12.11.1": true,
-    "sharp@0.34.5": true,
-    "unrs-resolver@1.12.2": true
   }
 }
