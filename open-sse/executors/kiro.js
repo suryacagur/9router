@@ -159,8 +159,18 @@ export class KiroExecutor extends BaseExecutor {
 
           // Handle assistantResponseEvent
           if (eventType === "assistantResponseEvent" && event.payload?.content) {
-            const content = event.payload.content;
+            let content = event.payload.content;
             state.totalContentLength += content.length;
+
+            // Strip inline <think>/<thinking> tags from Kiro assistant content.
+            // When thinking is enabled, Kiro returns thinking text in BOTH
+            // reasoningContentEvent (→ delta.reasoning_content) AND wrapped inside
+            // <think>...</think> / <thinking>...</thinking> tags in
+            // assistantResponseEvent.content. Without stripping, the reasoning text
+            // leaks into the visible content field — the core symptom of #2158.
+            if (typeof content === "string") {
+              content = content.replace(/<\/?(?:thinking|think)>/gi, "").trim();
+            }
 
             const chunk = {
               id: responseId,
