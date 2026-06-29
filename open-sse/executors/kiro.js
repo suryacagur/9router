@@ -122,7 +122,8 @@ export class KiroExecutor extends BaseExecutor {
       hasReasoningContent: false,
       reasoningChunkCount: 0,
       toolCallIndex: 0,
-      seenToolIds: new Map()
+      seenToolIds: new Map(),
+      inThinking: false
     };
 
     const transformStream = new TransformStream({
@@ -160,17 +161,35 @@ export class KiroExecutor extends BaseExecutor {
           // Handle assistantResponseEvent
           if (eventType === "assistantResponseEvent" && event.payload?.content) {
             let content = event.payload.content;
-            state.totalContentLength += content.length;
-
-            // Strip inline <think>/<thinking> tags from Kiro assistant content.
-            // When thinking is enabled, Kiro returns thinking text in BOTH
-            // reasoningContentEvent (→ delta.reasoning_content) AND wrapped inside
-            // <think>...</think> / <thinking>...</thinking> tags in
-            // assistantResponseEvent.content. Without stripping, the reasoning text
-            // leaks into the visible content field — the core symptom of #2158.
-            if (typeof content === "string") {
-              content = content.replace(/<\/?(?:thinking|think)>/gi, "").trim();
+            // Kiro Claude models can leak <thinking> blocks into the content stream.
+            // We strip these literal tags to prevent duplication, as the reasoning
+            // is already routed correctly via reasoningContentEvent.
+            if (state.inThinking) {
+              if (content.includes("</thinking>")) {
+                state.inThinking = false;
+                const after = content.split("</thinking>").slice(1).join("</thinking>");
+                content = after.startsWith("\n") ? after.substring(1) : after;
+              } else {
+                content = ""; // Drop entirely while inside thinking block
+              }
+            } else if (content.includes("<thinking>")) {
+              state.inThinking = true;
+              if (content.includes("</thinking>")) {
+                state.inThinking = false;
+                const before = content.split("<thinking>")[0];
+                const after = content.split("</thinking>").slice(1).join("</thinking>");
+                content = before + (after.startsWith("\n") ? after.substring(1) : after);
+              } else {
+                content = content.split("<thinking>")[0];
+              }
             }
+
+            if (!content && state.hasReasoningContent) {
+              // If we stripped everything, skip emitting an empty content chunk
+              continue;
+            }
+
+            state.totalContentLength += content.length;
 
             const chunk = {
               id: responseId,
