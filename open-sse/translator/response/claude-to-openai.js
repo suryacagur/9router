@@ -90,6 +90,9 @@ export function claudeToOpenAIResponse(chunk, state) {
         results.push(createChunk(state, { content: delta.text }));
       } else if (delta?.type === "thinking_delta" && delta.thinking) {
         results.push(createChunk(state, reasoningDelta(delta.thinking)));
+      } else if (delta?.type === "signature_delta" && delta.signature) {
+        if (!state.thinkingSignatures) state.thinkingSignatures = [];
+        state.thinkingSignatures.push(delta.signature);
       } else if (delta?.type === "input_json_delta" && delta.partial_json) {
         const toolCall = state.toolCalls.get(chunk.index);
         if (toolCall) {
@@ -131,6 +134,9 @@ export function claudeToOpenAIResponse(chunk, state) {
         const outputTokens = typeof chunk.usage.output_tokens === "number" ? chunk.usage.output_tokens : 0;
         const cacheReadTokens = typeof chunk.usage.cache_read_input_tokens === "number" ? chunk.usage.cache_read_input_tokens : (prev.cache_read_input_tokens || 0);
         const cacheCreationTokens = typeof chunk.usage.cache_creation_input_tokens === "number" ? chunk.usage.cache_creation_input_tokens : (prev.cache_creation_input_tokens || 0);
+        const thinkingTokens = typeof chunk.usage.output_tokens_details?.thinking_tokens === "number"
+          ? chunk.usage.output_tokens_details.thinking_tokens
+          : (prev.thinking_tokens || 0);
 
         // prompt_tokens = input_tokens + cache_read + cache_creation (all prompt-side tokens)
         const promptTokens = inputTokens + cacheReadTokens + cacheCreationTokens;
@@ -145,6 +151,7 @@ export function claudeToOpenAIResponse(chunk, state) {
 
         if (cacheReadTokens > 0) state.usage.cache_read_input_tokens = cacheReadTokens;
         if (cacheCreationTokens > 0) state.usage.cache_creation_input_tokens = cacheCreationTokens;
+        if (thinkingTokens > 0) state.usage.thinking_tokens = thinkingTokens;
       }
 
       if (chunk.delta?.stop_reason) {
@@ -165,7 +172,8 @@ export function claudeToOpenAIResponse(chunk, state) {
             input_tokens: state.usage.input_tokens || 0,
             output_tokens: state.usage.output_tokens || 0,
             cache_read_input_tokens: state.usage.cache_read_input_tokens,
-            cache_creation_input_tokens: state.usage.cache_creation_input_tokens
+            cache_creation_input_tokens: state.usage.cache_creation_input_tokens,
+            thinking_tokens: state.usage.thinking_tokens
           }, "claude");
         }
 
@@ -179,10 +187,15 @@ export function claudeToOpenAIResponse(chunk, state) {
       if (!state.finishReasonSent) {
         const finishReason = state.finishReason || (state.toolCalls?.size > 0 ? OPENAI_FINISH.TOOL_CALLS : OPENAI_FINISH.STOP);
         const usageObj = (state.usage && typeof state.usage === 'object') ? {
-          usage: {
-            prompt_tokens: state.usage.input_tokens || 0,
-            completion_tokens: state.usage.output_tokens || 0,
-            total_tokens: (state.usage.input_tokens || 0) + (state.usage.output_tokens || 0)
+          usage: toOpenAIUsage({
+            input_tokens: state.usage.input_tokens || 0,
+            output_tokens: state.usage.output_tokens || 0,
+            cache_read_input_tokens: state.usage.cache_read_input_tokens,
+            cache_creation_input_tokens: state.usage.cache_creation_input_tokens
+          }, "claude") || {
+            prompt_tokens: state.usage.prompt_tokens || 0,
+            completion_tokens: state.usage.completion_tokens || 0,
+            total_tokens: (state.usage.prompt_tokens || 0) + (state.usage.completion_tokens || 0)
           }
         } : {};
         results.push({ ...createChunk(state, {}, finishReason), ...usageObj });
